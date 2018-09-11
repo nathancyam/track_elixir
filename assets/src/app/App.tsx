@@ -1,5 +1,5 @@
 import { observable } from 'mobx';
-import { observer } from 'mobx-react';
+import { observer, Observer } from 'mobx-react';
 import * as React from 'react';
 
 import './App.css';
@@ -11,12 +11,12 @@ import Toolbar from '@material-ui/core/Toolbar';
 import Typography from '@material-ui/core/Typography';
 
 import { context as MapStateContext, MapState } from '../MapState';
-import { SessionContext } from '../channels/SessionProvider';
 import { Session } from '../channels/Session';
 import { MapApp } from '../map/MapApp';
+import { SessionContext } from '..';
 
 @observer
-class App extends React.Component<{ mapState: MapState }> {
+class App extends React.Component {
 
   @observable private userName: string;
 
@@ -24,39 +24,41 @@ class App extends React.Component<{ mapState: MapState }> {
     return (
       <MapStateContext.Consumer>
         {(mapState) => (
-          <div className="App">
-            <AppBar position="static" color="default">
-              <Toolbar>
-                <Typography variant="title" color="inherit">
-                  Trip Tracker
-                </Typography>
-              </Toolbar>
-            </AppBar>
-            {mapState.currentUser != null && <MapApp />}
-            {mapState.currentUser == null && <section>
-              <TextField
-                id="with-placeholder"
-                label="Your Name"
-                placeholder="What do people call you?"
-                margin="normal"
-                value={this.userName}
-                onChange={this.onChange}
-              />
-              <SessionContext.Consumer>
-                {(session) => (
-                  <MapStateContext.Consumer>
-                    {state => (
+          <Observer>
+            {() => (
+              <div className="App">
+                <AppBar position="static" color="default">
+                  <Toolbar>
+                    <Typography variant="title" color="inherit">
+                      Trip Tracker
+                    </Typography>
+                  </Toolbar>
+                </AppBar>
+                {mapState.loggedIn && <SessionContext.Consumer>
+                  {session => <MapApp session={session} />}
+                </SessionContext.Consumer>}
+                {!mapState.loggedIn && <section>
+                  <TextField
+                    id="with-placeholder"
+                    label="Your Name"
+                    placeholder="What do people call you?"
+                    margin="normal"
+                    value={this.userName}
+                    onChange={this.onChange}
+                  />
+                  <SessionContext.Consumer>
+                    {(session) => (
                       <Button
                         variant="contained"
                         color="primary"
-                        onClick={this.onClick(state, session)}>Submit
+                        onClick={this.onClick(mapState, session)}>Submit
                       </Button>
                     )}
-                  </MapStateContext.Consumer>
-                )}
-              </SessionContext.Consumer>
-            </section>}
-          </div>
+                  </SessionContext.Consumer>
+                </section>}
+              </div>
+            )}
+          </Observer>
         )}
       </MapStateContext.Consumer>
     );
@@ -66,9 +68,10 @@ class App extends React.Component<{ mapState: MapState }> {
     this.userName = event.currentTarget.value;
   }
 
-  private onClick = (state: MapState, session: Session) => (event: React.MouseEvent<any>) => {
+  private onClick = (state: MapState, session: Session) => async (event: React.MouseEvent<any>) => {
     event.preventDefault();
-    session.createNewUser({ id: "", name: this.userName });
+    const response = await session.createNewUser({ id: "", name: this.userName });
+    state.createSession(response);
   }
 }
 

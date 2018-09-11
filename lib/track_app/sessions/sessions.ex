@@ -26,4 +26,8 @@ defmodule TrackApp.Sessions do
   def add_point_of_interest(session_id, %PointOfInterest{} = point) do
     Session.add_point_of_interest(session_id, point)
   end
+
+  def ping(session_id) do
+    Session.ping(session_id)
+  end
 end

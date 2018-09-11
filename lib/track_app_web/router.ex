@@ -18,7 +18,9 @@ defmodule TrackAppWeb.Router do
   end
 
   # Other scopes may use custom stacks.
-  # scope "/api", TrackAppWeb do
-  #   pipe_through :api
-  # end
+  scope "/api", TrackAppWeb do
+    pipe_through :api
+    post "/user", UserController, :create
+    options "/user", UserController, :options
+  end
 end

@@ -1,5 +1,6 @@
-import { observable } from 'mobx';
+import { observable, action, computed } from 'mobx';
 import { createContext } from 'react';
+import { NewUserResponse } from './channels/Session';
 
 interface PointOfInterest {
   name: string;
@@ -19,7 +20,26 @@ interface Session {
 export class MapState {
   @observable public pointsOfInterest: PointOfInterest[] = [];
   @observable public currentUser: User;
-  @observable public sessions: Session[];
+  @observable public sessions: Session[] = [];
+
+  @computed public get loggedIn(): boolean {
+    console.log('isloggedin', this.currentUser);
+    return this.currentUser != null;
+  }
+
+  @action public createSession(payload: NewUserResponse): void {
+    debugger;
+    this.currentUser = payload.user;
+    this.sessions.push({ id: payload.session_id });
+  }
+
+  @action public createCoordinate(coordinate: { lat: number, lng: number }) {
+    this.pointsOfInterest.push({
+      lat: coordinate.lat.toString(),
+      long: coordinate.lng.toString(),
+      name: '',
+    });
+  }
 }
 
 export const state = new MapState();
