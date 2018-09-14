@@ -32,7 +32,15 @@ defmodule TrackApp.Sessions.Session do
   end
 
   def add_point_of_interest(session_id, %PointOfInterest{} = point) do
-    GenServer.call(via_tuple(session_id), {:poi_add, point})
+    GenServer.cast(via_tuple(session_id), {:poi_add, point})
+  end
+
+  def state(session_id) do
+    GenServer.call(via_tuple(session_id), :state)
+  end
+
+  def handle_call(:state, _from, state) do
+    {:reply, state, state}
   end
 
   def handle_call(:ping, _from, state) do
@@ -43,9 +51,9 @@ defmodule TrackApp.Sessions.Session do
     {:reply, user, %{state | users: current_users ++ user}}
   end
 
-  def handle_call({:poi_add, %PointOfInterest{} = point}, _from, %State{points_of_interest: points} = state) do
-    new_points = points ++ point
-    {:reply, new_points, %{state | points_of_interest: new_points}}
+  def handle_cast({:poi_add, %PointOfInterest{} = point}, %State{points_of_interest: points} = state) do
+    new_points = points ++ [point]
+    {:noreply, %{state | points_of_interest: new_points}}
   end
 
   defp via_tuple(uuid) do

@@ -1,8 +1,13 @@
 defmodule TrackAppWeb.RoomChannel do
   use Phoenix.Channel
 
-  alias TrackApp.Data.User
+  alias TrackAppWeb.Endpoint
+  alias TrackApp.Data.{PointOfInterest, User}
   alias TrackApp.Sessions
+
+  def join("room:lobby", _message, socket) do
+    {:ok, socket}
+  end
 
   def join("room:" <> session_id, _message, socket) do
     case Sessions.ping(session_id) do
@@ -19,6 +24,22 @@ defmodule TrackAppWeb.RoomChannel do
 
   def handle_in("new_coordinates", %{"lat" => lat, "lng" => long} = coordinates, socket) do
     broadcast!(socket, "new_entry", coordinates)
+    "room:" <> session_id = socket.topic
+    point = %PointOfInterest{
+      name: "",
+      longitude: long,
+      latitude: lat,
+      notes: "",
+      user: socket.assigns[:user_id]
+    }
+
+    Sessions.add_point_of_interest(session_id, point)
     {:noreply, socket}
   end
+
+  def handle_in("sync", _body, socket) do
+    "room:" <> session_id = socket.topic
+    {:reply, {:ok, Sessions.state(session_id)}, socket}
+  end
+
 end

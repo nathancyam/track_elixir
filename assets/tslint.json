@@ -10,7 +10,10 @@
         "import-sources-order": "any",
         "named-imports-order": "any"
       }
-    ]
+    ],
+    "class-name": false,
+    "jsx-no-lambda": false,
+    "max-classes-per-file": false
   },
   "linterOptions": {
     "exclude": [

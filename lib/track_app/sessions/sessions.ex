@@ -30,4 +30,9 @@ defmodule TrackApp.Sessions do
   def ping(session_id) do
     Session.ping(session_id)
   end
+
+  def state(session_id) do
+    Session.state(session_id)
+  end
+
 end

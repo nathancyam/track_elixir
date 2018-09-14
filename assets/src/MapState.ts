@@ -28,7 +28,6 @@ export class MapState {
   }
 
   @action public createSession(payload: NewUserResponse): void {
-    debugger;
     this.currentUser = payload.user;
     this.sessions.push({ id: payload.session_id });
   }

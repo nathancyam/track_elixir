@@ -1,9 +1,17 @@
 import { Channel, Socket } from "phoenix";
-import { User, MapState } from "../MapState";
+import { User } from "../MapState";
+import { Store, AnyAction } from "redux";
+import { AppState, AppActions, applicationActions } from "../modules/Application";
 
 export interface NewUserResponse {
   user: User;
   session_id: string;
+}
+
+export interface SyncResponse {
+  users: Array<{ name: string, id: string }>,
+  points_of_interest: Array<{ user: string, notes: string, name: string, longitude: number, latitude: number }>;
+  id: string;
 }
 
 export class Session {
@@ -13,10 +21,10 @@ export class Session {
   public roomChannel: Channel;
   private socket: Socket;
 
-  constructor(private endpoint: string, private mapState: MapState) {
+  constructor(private endpoint: string, private store: Store<{ application: AppState }, AppActions | AnyAction>) {
   }
 
-  public async createNewUser(user: User): Promise<NewUserResponse> {
+  public async createNewUserAndSession(user: User, sessionId: string | null = null): Promise<NewUserResponse> {
     const response = await fetch('http://localhost:4000/api/user', {
       body: JSON.stringify({ name: user.name }),
       headers: {
@@ -35,13 +43,15 @@ export class Session {
       },
     });
 
+    sessionId = sessionId ? sessionId : json.session_id;
+
     this.socket.connect();
-    this.roomChannel = this.socket.channel(`room:${json.session_id}`, {});
+    this.roomChannel = this.socket.channel(`room:${sessionId}`, {});
     this.roomChannel.join();
     this.bindCallbacks();
 
     return {
-      session_id: json.session_id,
+      session_id: sessionId,
       user: {
         ...user,
         id: json.user_id,
@@ -53,14 +63,23 @@ export class Session {
     return await this.promisifyChannelPushCall<void>("new_coordinates", coordinates);
   }
 
-  private bindCallbacks() {
-    this.roomChannel.on("new_entry", (entry) => {
-      console.log('Creating new entry', entry);
-      this.mapState.createCoordinate(entry);
+  public async sync() {
+    const sync = await this.promisifyChannelPushCall<SyncResponse>("sync");
+    sync.points_of_interest.forEach(p => {
+      this.store.dispatch(applicationActions.createCoordinate({
+        lat: p.latitude,
+        lng: p.longitude,
+      }));
     });
   }
 
-  private promisifyChannelPushCall<T>(message: string, payload: any): Promise<T> {
+  private bindCallbacks() {
+    this.roomChannel.on("new_entry", (entry) => {
+      this.store.dispatch(applicationActions.createCoordinate(entry));
+    });
+  }
+
+  private promisifyChannelPushCall<T>(message: string, payload?: any): Promise<T> {
     return new Promise<T>((resolve, reject) => {
       this.roomChannel.push(message, payload)
         .receive("ok", (res) => resolve(res as T))

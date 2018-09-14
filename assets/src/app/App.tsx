@@ -1,78 +1,100 @@
-import { observable } from 'mobx';
-import { observer, Observer } from 'mobx-react';
 import * as React from 'react';
+import { connect } from 'react-redux';
+import { Route, Switch, Redirect, RouteComponentProps, withRouter } from 'react-router-dom';
 
 import './App.css';
 
-import AppBar from '@material-ui/core/AppBar';
-import Button from '@material-ui/core/Button';
-import TextField from '@material-ui/core/TextField';
-import Toolbar from '@material-ui/core/Toolbar';
-import Typography from '@material-ui/core/Typography';
+import { Session, NewUserResponse } from '../channels/Session';
+import { LoginScreen } from '../screens/LoginScreen';
+import { MapApp } from '../screens/MapApp';
+import { MenuAppBar } from '../components/MenuAppBar';
+import { PrivateRoute } from '../components/PrivateRoute';
+import { AppState, applicationActions } from '../modules/Application';
+import { push } from 'react-router-redux';
 
-import { context as MapStateContext, MapState } from '../MapState';
-import { Session } from '../channels/Session';
-import { MapApp } from '../map/MapApp';
-import { SessionContext } from '..';
+interface RouteContainerProps {
+  isLoggedIn: boolean;
+  onCreateSession: (payload: NewUserResponse) => void;
+  onClick: (session: Session, name: string, sessionId?: string) => Promise<void>;
+}
 
-@observer
-class App extends React.Component {
-
-  @observable private userName: string;
-
+class RouteContainer extends React.Component<RouteContainerProps & { activeSession: string | null }> {
   public render() {
     return (
-      <MapStateContext.Consumer>
-        {(mapState) => (
-          <Observer>
-            {() => (
-              <div className="App">
-                <AppBar position="static" color="default">
-                  <Toolbar>
-                    <Typography variant="title" color="inherit">
-                      Trip Tracker
-                    </Typography>
-                  </Toolbar>
-                </AppBar>
-                {mapState.loggedIn && <SessionContext.Consumer>
-                  {session => <MapApp session={session} />}
-                </SessionContext.Consumer>}
-                {!mapState.loggedIn && <section>
-                  <TextField
-                    id="with-placeholder"
-                    label="Your Name"
-                    placeholder="What do people call you?"
-                    margin="normal"
-                    value={this.userName}
-                    onChange={this.onChange}
-                  />
-                  <SessionContext.Consumer>
-                    {(session) => (
-                      <Button
-                        variant="contained"
-                        color="primary"
-                        onClick={this.onClick(mapState, session)}>Submit
-                      </Button>
-                    )}
-                  </SessionContext.Consumer>
-                </section>}
-              </div>
-            )}
-          </Observer>
-        )}
-      </MapStateContext.Consumer>
+      <Switch>
+        <Route
+          exact={true}
+          path="/login"
+          render={({ location }) =>
+            this.props.isLoggedIn
+              ? this.mapRedirect
+              : <LoginScreen onClick={this.onClick} location={location} />
+          }
+        />
+        <PrivateRoute
+          exact={true}
+          path="/map/:sessionId"
+          isAllowed={this.props.isLoggedIn}
+          render={({ location }) => <MapApp pointsOfInterests={[]} location={location} />}
+        />
+        <Route
+          exact={true}
+          path="/"
+          render={() => {
+            return this.props.isLoggedIn
+              ? this.mapRedirect
+              : <Redirect to="/login" />
+          }}
+        />
+      </Switch>
     );
   }
 
-  private onChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    this.userName = event.currentTarget.value;
+  private get mapRedirect(): JSX.Element {
+    return <Redirect to={`/map/${this.props.activeSession}`} />;
   }
 
-  private onClick = (state: MapState, session: Session) => async (event: React.MouseEvent<any>) => {
-    event.preventDefault();
-    const response = await session.createNewUser({ id: "", name: this.userName });
-    state.createSession(response);
+  private onClick = async (session: Session, name: string, sessionId: string | null) => {
+    if (sessionId != null) {
+      this.props.onClick(session, name, sessionId);
+    } else {
+      this.props.onClick(session, name);
+    }
   }
 }
 
-export default App;
+class App extends React.Component<{ isLoggedIn: boolean, activeSession: string | null, onCreateSession: (payload: NewUserResponse) => void, onLogin: () => void }> {
+
+  public render() {
+    return (
+      <div className="App">
+        <MenuAppBar isLoggedIn={this.props.isLoggedIn} />
+        <div>
+          <RouteContainer
+            {...this.props}
+            onClick={this.onClick}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  private onClick = async (session: Session, name: string, sessionId?: string): Promise<void> => {
+    const response = await session.createNewUserAndSession({ id: "", name }, sessionId);
+    this.props.onCreateSession(response);
+  }
+}
+
+export const ConnectedApp = connect<{ isLoggedIn: boolean, activeSession: string | null }, { onCreateSession: (payload: NewUserResponse) => void, onLogin: () => void }, RouteComponentProps<any>, { application: AppState }>((state) => ({
+  activeSession: state.application.activeSession ? state.application.activeSession.id : null,
+  isLoggedIn: state.application.currentUser != null
+}), (dispatch) => ({
+  onCreateSession(payload: NewUserResponse) {
+    dispatch(applicationActions.createSession(payload));
+  },
+  onLogin() {
+    dispatch(push('/map'))
+  }
+}))(App);
+
+export default withRouter(ConnectedApp);

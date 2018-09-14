@@ -21,6 +21,7 @@ defmodule TrackAppWeb.Router do
   scope "/api", TrackAppWeb do
     pipe_through :api
     post "/user", UserController, :create
+    get "/users", UserController, :list
     options "/user", UserController, :options
   end
 end
